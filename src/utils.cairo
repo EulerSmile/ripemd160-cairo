@@ -98,6 +98,11 @@ func JJ{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(a, b, c, d, e, x, s) -> 
     return (res1=res1, res2=res2)
 end
 
+func FFF{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(a, b, c, d, e, x, s) -> (res1, res2):
+    let (res) = FF(a, b, c, d, e, x, s)
+    return (res=res)
+end
+
 func GGG{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(a, b, c, d, e, x, s) -> (res1, res2):
     let (g_bcd) = G(b, c, d)
     let (a) = a + g_bcd + x + 0x7a6d76e9
