@@ -2,8 +2,9 @@
 
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.dict_access import DictAccess
+from starkware.cairo.common.default_dict import default_dict_new
 from starkware.cairo.common.dict import dict_new, dict_write
-from rmd160 import init, compress, finish
+from rmd160 import init, compress, finish, dict_to_array
 from utils import BYTES_TO_WORD
 
 func RMD{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(msg: felt*, msglen: felt) -> (hash: felt*):
@@ -11,7 +12,7 @@ func RMD{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(msg: felt*, msglen: fel
     local buf: felt*
     init(buf, 5)
 
-    let (x) = dict_new()
+    let (x) = default_dict_new()
     let (res, rsize) = compress_data{dict_ptr=x}(buf, 5, msg, msglen)
     let (res, rsize) = finish{dict_ptr=x}(res, rsize, msg, msglen, 0)
     return (hash=res)
@@ -34,7 +35,8 @@ func compress_data{dict_ptr: DictAccess*}(buf: felt*, bufsize: felt, msg: felt*,
     end
 
     parse_msg{dict_ptr=dict_ptr}(msg, 0)
-    let (res, rsize) = compress{dict_ptr=dict_ptr}(buf, bufsize)
+    let (arr_x) = dict_to_array{dict_ptr=dict_ptr}()
+    let (res, rsize) = compress(buf, bufsize, arr_x, 16)
     let (res, rsize) = compress_data{dict_ptr=dict_ptr}(res, rsize, msg+64, msglen-64)
     return (res=res, rsize=rsize)
 end
