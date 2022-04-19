@@ -4,7 +4,7 @@ from starkware.cairo.common.math import unsigned_div_rem
 from starkware.cairo.common.math_cmp import is_nn_le
 from starkware.cairo.common.bitwise import bitwise_and, bitwise_xor, bitwise_or
 from starkware.cairo.common.dict_access import DictAccess
-from starkware.cairo.common.default_dict import default_dict_new
+from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict import dict_new, dict_read, dict_write, dict_squash
 from utils import FF, GG, HH, II, JJ, FFF, GGG, HHH, III, JJJ
 from pow2 import pow2
@@ -24,7 +24,6 @@ end
 # transforms buf using message bytes X[0] through X[15].
 func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsize: felt, x: felt*, xlen: felt) -> (res: felt*, rsize: felt):
     alloc_locals
-    local res: felt*
 
     assert bufsize = 5
     assert xlen = 16
@@ -223,6 +222,7 @@ func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsiz
     # combine results
     let ddd = ddd + cc + [buf + 1]
     
+    let (local res: felt*) = alloc()
     assert res[0] = ddd
     assert res[1] = [buf + 2] + dd + eee
     assert res[2] = [buf + 3] + ee + aaa
@@ -255,38 +255,60 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
     dict_write{dict_ptr=x}(index, val)
 
     # length goes to next block.
-    let (arr_x) = dict_to_array{dict_ptr=x}()
-    let (next_block) = is_nn_le(55, len)
-    if next_block == 1:
-        let (buf, bufsize) = compress(buf, bufsize, arr_x, 16)
-        # TODO
-        # let (local x) = default_dict_new(0)
-    # else:
-    #     tempvar x = x
-    end
-
     let val = dsize * 8
-    dict_write{dict_ptr=x}(14, val)
     let (pow2_29) = pow2(29)
     let (factor, _) = unsigned_div_rem(dsize, pow2_29)
     let len_8 = mswlen * 8
     let (val_15) = bitwise_or(factor, len_8)
-    dict_write{dict_ptr=x}(15, val_15)
 
     let (arr_x) = dict_to_array{dict_ptr=x}()
-    let (res, rsize) = compress(buf, bufsize, arr_x, 16)
-    return (res=res, rsize=rsize)
+    let (next_block) = is_nn_le(55, len)
+    if next_block == 1:
+        let (buf, bufsize) = compress(buf, bufsize, arr_x, 16)
+        # reset dict to all 0.
+        let (x) = default_dict_new(0)
+
+        dict_write{dict_ptr=x}(14, val)
+        dict_write{dict_ptr=x}(15, val_15)
+
+        let (arr_x) = dict_to_array{dict_ptr=x}()
+        let (_, _) = default_dict_finalize(x, x, 0)
+        let (res, rsize) = compress(buf, bufsize, arr_x, 16)
+        return (res=res, rsize=rsize)
+    else:
+        dict_write{dict_ptr=x}(14, val)
+        dict_write{dict_ptr=x}(15, val_15)
+
+        let (arr_x) = dict_to_array{dict_ptr=x}()
+        let (_, _) = default_dict_finalize(x, x, 0)
+        let (res, rsize) = compress(buf, bufsize, arr_x, 16)
+        return (res=res, rsize=rsize)
+    end
+
+    # let val = dsize * 8
+    # dict_write{dict_ptr=x}(14, val)
+    # let (pow2_29) = pow2(29)
+    # let (factor, _) = unsigned_div_rem(dsize, pow2_29)
+    # let len_8 = mswlen * 8
+    # let (val_15) = bitwise_or(factor, len_8)
+    # dict_write{dict_ptr=x}(15, val_15)
+
+    # let (arr_x) = dict_to_array{dict_ptr=x}()
+    # let (_, _) = default_dict_finalize(x, x, 0)
+    # let (res, rsize) = compress(buf, bufsize, arr_x, 16)
+    # return (res=res, rsize=rsize)
 end
 
-func absorb_data{dict_ptr : DictAccess*}(data: felt*, len: felt, index: felt):
+func absorb_data{range_check_ptr, bitwise_ptr : BitwiseBuiltin*, dict_ptr : DictAccess*}(data: felt*, len: felt, index: felt):
     if index - len == 0:
         return ()
     end
 
     let (index_4, _) = unsigned_div_rem(index, 4)
     let (index_and_3) = bitwise_and(index, 3)
-    let (factor) = 8 * index_and_3
-    let (tmp) = [data] * pow2(factor)
+    let factor = 8 * index_and_3
+    let (factor) = pow2(factor)
+    let tmp = [data] * factor
     let (old_val) = dict_read{dict_ptr=dict_ptr}(index_4)
     let (val) = bitwise_xor(old_val, tmp)
     dict_write{dict_ptr=dict_ptr}(index_4, val)
@@ -297,7 +319,6 @@ end
 
 func dict_to_array{dict_ptr : DictAccess*}()-> (res: felt*):
     alloc_locals
-    local res: felt*
 
     let (x0) = dict_read{dict_ptr=dict_ptr}(0)
     let (x1) = dict_read{dict_ptr=dict_ptr}(1)
@@ -316,6 +337,7 @@ func dict_to_array{dict_ptr : DictAccess*}()-> (res: felt*):
     let (x14) = dict_read{dict_ptr=dict_ptr}(14)
     let (x15) = dict_read{dict_ptr=dict_ptr}(15)
 
+    let (local res: felt*) = alloc()
     assert res[0] = x0
     assert res[1] = x1
     assert res[2] = x2
