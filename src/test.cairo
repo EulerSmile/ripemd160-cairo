@@ -1,10 +1,12 @@
-%builtins range_check bitwise
+%builtins output range_check bitwise
 
+from starkware.cairo.common.serialize import serialize_word
 from starkware.cairo.common.cairo_builtins import BitwiseBuiltin
 from starkware.cairo.common.alloc import alloc
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.default_dict import default_dict_new
 from starkware.cairo.common.dict import dict_new, dict_write, dict_squash
+from starkware.cairo.common.math_cmp import is_le
 from rmd160 import init, compress, finish, dict_to_array
 from utils import BYTES_TO_WORD
 
@@ -26,7 +28,7 @@ func parse_msg{dict_ptr: DictAccess*, bitwise_ptr: BitwiseBuiltin*}(msg: felt*, 
         return ()
     end
 
-    let (val) = BYTES_TO_WORD{bitwise_ptr=bitwise_ptr}(msg)
+    let (val) = BYTES_TO_WORD(msg)
     dict_write{dict_ptr=dict_ptr}(index, val)
     parse_msg{dict_ptr=dict_ptr, bitwise_ptr=bitwise_ptr}(msg=msg+4, index=index+1)
     return ()
@@ -34,7 +36,8 @@ end
 
 func compress_data{dict_ptr: DictAccess*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(buf: felt*, bufsize: felt, msg: felt*, msglen: felt) -> (res: felt*, rsize: felt):
     alloc_locals
-    if msglen - 63 == 0:
+    let (len_lt_63) = is_le(msglen, 63)
+    if len_lt_63 == 1:
         return (buf, bufsize)
     end
 
@@ -46,15 +49,19 @@ func compress_data{dict_ptr: DictAccess*, range_check_ptr, bitwise_ptr: BitwiseB
     return (res=res, rsize=rsize)
 end
 
-func main{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}():
+func main{output_ptr : felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}():
     # test vectors:
     # message: "a"
-    # hashcode: 508a6ccc545b32641fe7311048defe7cf599ada3
+    # hashcode: 0bdc9d2d256b3ee9daae347be6f4dc835a467ffe
     alloc_locals
-    # local msg : felt*
-    tempvar msg : felt* = new (97)
-    # assert [msg] = 97
+    let (local msg: felt*) = alloc()
+    assert [msg] = 97
     let (hash) = RMD(msg, 1)
+    serialize_word(hash[0])
+    serialize_word(hash[1])
+    serialize_word(hash[2])
+    serialize_word(hash[3])
+    serialize_word(hash[4])
 
     return ()
 end
