@@ -239,6 +239,7 @@ end
 func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize: felt, data: felt*, dsize: felt, mswlen: felt) -> (res: felt*, rsize: felt):
     alloc_locals
     let (x) = default_dict_new(0)
+    let start = x
 
     # put data into x.
     let (local len) = bitwise_and(dsize, 63)
@@ -272,7 +273,7 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
         dict_write{dict_ptr=x}(15, val_15)
 
         let (arr_x) = dict_to_array{dict_ptr=x}()
-        let (_, _) = default_dict_finalize(x, x, 0)
+        let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(start, x)
         let (res, rsize) = compress(buf, bufsize, arr_x, 16)
         return (res=res, rsize=rsize)
     else:
@@ -280,23 +281,10 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
         dict_write{dict_ptr=x}(15, val_15)
 
         let (arr_x) = dict_to_array{dict_ptr=x}()
-        let (_, _) = default_dict_finalize(x, x, 0)
+        let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(start, x)
         let (res, rsize) = compress(buf, bufsize, arr_x, 16)
         return (res=res, rsize=rsize)
     end
-
-    # let val = dsize * 8
-    # dict_write{dict_ptr=x}(14, val)
-    # let (pow2_29) = pow2(29)
-    # let (factor, _) = unsigned_div_rem(dsize, pow2_29)
-    # let len_8 = mswlen * 8
-    # let (val_15) = bitwise_or(factor, len_8)
-    # dict_write{dict_ptr=x}(15, val_15)
-
-    # let (arr_x) = dict_to_array{dict_ptr=x}()
-    # let (_, _) = default_dict_finalize(x, x, 0)
-    # let (res, rsize) = compress(buf, bufsize, arr_x, 16)
-    # return (res=res, rsize=rsize)
 end
 
 func absorb_data{range_check_ptr, bitwise_ptr : BitwiseBuiltin*, dict_ptr : DictAccess*}(data: felt*, len: felt, index: felt):

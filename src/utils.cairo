@@ -4,13 +4,17 @@ from starkware.cairo.common.math import assert_nn_le, unsigned_div_rem
 from pow2 import pow2
 
 # collect four bytes into one word.
-func BYTES_TO_WORD{bitwise_ptr : BitwiseBuiltin*}(x: felt*) -> (res):
-    let (factor_3) = pow2(24)
-    let (factor_2) = pow2(16)
-    let (factor_1) = pow2(8)
-    let l1 = [x + 3] * factor_3
-    let l2 = [x + 2] * factor_2
-    let l3 = [x + 1] * factor_1
+func BYTES_TO_WORD{bitwise_ptr: BitwiseBuiltin*}(x: felt*) -> (res):
+    alloc_locals
+    let (local factor_3: felt) = pow2(24)
+    let (local factor_2) = pow2(16)
+    let (local factor_1) = pow2(8)
+    tempvar x3: felt = x[3]
+    local x2 = [x + 2]
+    local x1 = [x + 1]
+    tempvar l1 = factor_3 * x3
+    tempvar l2 = x2 * factor_2
+    tempvar l3 = x1 * factor_1
     let l4 = [x]
     let (l1_or_l2) = bitwise_or(l1, l2)
     let (l1_or_l2_or_l3) = bitwise_or(l1_or_l2, l3)
@@ -20,7 +24,7 @@ end
 
 #  ROL(x, n) cyclically rotates x over n bits to the left
 # x must be of an unsigned 32 bits type and 0 <= n < 32.
-func ROL{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(x, n) -> (res):
+func ROL{bitwise_ptr: BitwiseBuiltin*, range_check_ptr}(x, n) -> (res):
     assert_nn_le(x, 2**32-1)
     assert_nn_le(n, 31)
 
