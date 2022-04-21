@@ -16,58 +16,33 @@ func absorb_data{range_check_ptr, bitwise_ptr : BitwiseBuiltin*, dict_ptr : Dict
 
     let (index_4, _) = unsigned_div_rem(index, 4)
     let (index_and_3) = bitwise_and(index, 3)
-    let factor = 8 * index_and_3
+    let (_, factor) = unsigned_div_rem(8 * index_and_3, MAX_32_BIT)
     let (factor) = pow2(factor)
-    let tmp = [data] * factor
+    let (_, tmp) = unsigned_div_rem([data] * factor, MAX_32_BIT)
     let (old_val) = dict_read{dict_ptr=dict_ptr}(index_4)
     let (val) = bitwise_xor(old_val, tmp)
+    let (_, val) = unsigned_div_rem(val, MAX_32_BIT)
     dict_write{dict_ptr=dict_ptr}(index_4, val)
 
     absorb_data{dict_ptr=dict_ptr}(data+1, len, index+1)
     return ()
 end
 
-func dict_to_array{dict_ptr : DictAccess*}()-> (res: felt*):
-    alloc_locals
+func dict_to_array{dict_ptr : DictAccess*}(arr: felt*, len):
+    if len == 0:
+        return ()
+    end
 
-    let (x0) = dict_read{dict_ptr=dict_ptr}(0)
-    let (x1) = dict_read{dict_ptr=dict_ptr}(1)
-    let (x2) = dict_read{dict_ptr=dict_ptr}(2)
-    let (x3) = dict_read{dict_ptr=dict_ptr}(3)
-    let (x4) = dict_read{dict_ptr=dict_ptr}(4)
-    let (x5) = dict_read{dict_ptr=dict_ptr}(5)
-    let (x6) = dict_read{dict_ptr=dict_ptr}(6)
-    let (x7) = dict_read{dict_ptr=dict_ptr}(7)
-    let (x8) = dict_read{dict_ptr=dict_ptr}(8)
-    let (x9) = dict_read{dict_ptr=dict_ptr}(9)
-    let (x10) = dict_read{dict_ptr=dict_ptr}(10)
-    let (x11) = dict_read{dict_ptr=dict_ptr}(11)
-    let (x12) = dict_read{dict_ptr=dict_ptr}(12)
-    let (x13) = dict_read{dict_ptr=dict_ptr}(13)
-    let (x14) = dict_read{dict_ptr=dict_ptr}(14)
-    let (x15) = dict_read{dict_ptr=dict_ptr}(15)
+    let index = len - 1
+    let (x) = dict_read{dict_ptr=dict_ptr}(index)
+    assert arr[index] = x
 
-    let (local res: felt*) = alloc()
-    assert res[0] = x0
-    assert res[1] = x1
-    assert res[2] = x2
-    assert res[3] = x3
-    assert res[4] = x4
-    assert res[5] = x5
-    assert res[6] = x6
-    assert res[7] = x7
-    assert res[8] = x8
-    assert res[9] = x9
-    assert res[10] = x10
-    assert res[11] = x11
-    assert res[12] = x12
-    assert res[13] = x13
-    assert res[14] = x14
-    assert res[15] = x15
+    dict_to_array{dict_ptr=dict_ptr}(arr, len - 1)
 
-    return (res=res)
+    return ()
 end
 
+# init buf to magic constants.
 func init(buf: felt*, size: felt):
     assert size = 5
     assert [buf] = 0x67452301
@@ -194,7 +169,7 @@ func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsiz
     let (local eee, local bbb) = JJJ(eee, aaa, bbb, ccc, ddd, [x + 14], 9)
     let (local ddd, local aaa) = JJJ(ddd, eee, aaa, bbb, ccc, [x +  7], 9)
     let (local ccc, local eee) = JJJ(ccc, ddd, eee, aaa, bbb, [x +  0],11)
-    let (local bbb, local eee) = JJJ(bbb, ccc, ddd, eee, aaa, [x +  9],13)
+    let (local bbb, local ddd) = JJJ(bbb, ccc, ddd, eee, aaa, [x +  9],13)
     let (local aaa, local ccc) = JJJ(aaa, bbb, ccc, ddd, eee, [x +  2],15)
     let (local eee, local bbb) = JJJ(eee, aaa, bbb, ccc, ddd, [x + 11],15)
     let (local ddd, local aaa) = JJJ(ddd, eee, aaa, bbb, ccc, [x +  4], 5)
@@ -280,14 +255,17 @@ func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsiz
     let (local bbb, local ddd) = FFF(bbb, ccc, ddd, eee, aaa, [x + 11],11)
 
     # combine results
-    let ddd = ddd + cc + [buf + 1]
-    
     let (local res: felt*) = alloc()
-    assert res[0] = ddd
-    assert res[1] = [buf + 2] + dd + eee
-    assert res[2] = [buf + 3] + ee + aaa
-    assert res[3] = [buf + 4] + aa + bbb
-    assert res[4] = [buf] + bb + ccc
+    let (_, res0) = unsigned_div_rem([buf + 1] + cc + ddd, MAX_32_BIT)
+    let (_, res1) = unsigned_div_rem([buf + 2] + dd + eee, MAX_32_BIT)
+    let (_, res2) = unsigned_div_rem([buf + 3] + ee + aaa, MAX_32_BIT)
+    let (_, res3) = unsigned_div_rem([buf + 4] + aa + bbb, MAX_32_BIT)
+    let (_, res4) = unsigned_div_rem([buf + 0] + bb + ccc, MAX_32_BIT)
+    assert res[0] = res0
+    assert res[1] = res1
+    assert res[2] = res2
+    assert res[3] = res3
+    assert res[4] = res4
 
     return (res=res, rsize=5)
 end
@@ -303,28 +281,32 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
 
     # put data into x.
     let (local len) = bitwise_and(dsize, 63)
+    let (_, len) = unsigned_div_rem(len, MAX_32_BIT)
     absorb_data{dict_ptr=x}(data, len, 0)
 
     # append the bit m_n == 1.
     let (index_4, _) = unsigned_div_rem(dsize, 4)
     let (local index) = bitwise_and(index_4, 15)
+    let (_, index) = unsigned_div_rem(index, MAX_32_BIT)
     let (old_val) = dict_read{dict_ptr=x}(index)
     let (local ba_3) = bitwise_and(dsize, 3)
-    let factor = 8 * ba_3 + 7
+    let (_, factor) = unsigned_div_rem(8 * ba_3 + 7, MAX_32_BIT)
     let (tmp) = pow2(factor)
     let (local val) = bitwise_xor(old_val, tmp)
     dict_write{dict_ptr=x}(index, val)
 
     # length goes to next block.
-    let val = dsize * 8
+    let (_, val) = unsigned_div_rem(dsize * 8, MAX_32_BIT)
     let (pow2_29) = pow2(29)
     let (factor, _) = unsigned_div_rem(dsize, pow2_29)
     let len_8 = mswlen * 8
     let (val_15) = bitwise_or(factor, len_8)
+    let (_, val_15) = unsigned_div_rem(val_15, MAX_32_BIT)
 
-    let (arr_x) = dict_to_array{dict_ptr=x}()
     let (next_block) = is_nn_le(55, len)
     if next_block == 1:
+        let (local arr_x: felt*) = alloc()
+        dict_to_array{dict_ptr=x}(arr_x, 16)
         let (buf, bufsize) = compress(buf, bufsize, arr_x, 16)
         # reset dict to all 0.
         let (x) = default_dict_new(0)
@@ -332,7 +314,8 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
         dict_write{dict_ptr=x}(14, val)
         dict_write{dict_ptr=x}(15, val_15)
 
-        let (arr_x) = dict_to_array{dict_ptr=x}()
+        let (local arr_x: felt*) = alloc()
+        dict_to_array{dict_ptr=x}(arr_x, 16)
         let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(start, x)
         let (res, rsize) = compress(buf, bufsize, arr_x, 16)
         return (res=res, rsize=rsize)
@@ -340,7 +323,8 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
         dict_write{dict_ptr=x}(14, val)
         dict_write{dict_ptr=x}(15, val_15)
 
-        let (arr_x) = dict_to_array{dict_ptr=x}()
+        let (local arr_x: felt*) = alloc()
+        dict_to_array{dict_ptr=x}(arr_x, 16)
         let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(start, x)
         let (res, rsize) = compress(buf, bufsize, arr_x, 16)
         return (res=res, rsize=rsize)

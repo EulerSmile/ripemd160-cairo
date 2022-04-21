@@ -4,28 +4,31 @@ from starkware.cairo.common.math import assert_nn_le, unsigned_div_rem
 from pow2 import pow2
 
 const MAX_32_BIT = 2 ** 32
+const MAX_BYTE = 2 ** 8
 
 func uint32_not(x : felt) -> (not_x : felt):
     return (not_x=MAX_32_BIT - 1 - x)
 end
 
 # collect four bytes into one word.
-func BYTES_TO_WORD{bitwise_ptr: BitwiseBuiltin*}(x: felt*) -> (res: felt):
+func BYTES_TO_WORD{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x: felt*) -> (res: felt):
     alloc_locals
-    let (local factor_3: felt) = pow2(24)
+    let (local factor_3) = pow2(24)
     let (local factor_2) = pow2(16)
     let (local factor_1) = pow2(8)
-    tempvar x3: felt = x[3]
+    local x3 = [x + 3]
     local x2 = [x + 2]
     local x1 = [x + 1]
-    tempvar l1 = factor_3 * x3
+    tempvar l1 = x3 * factor_3
+    let (_, l1) = unsigned_div_rem(l1, MAX_32_BIT)
     tempvar l2 = x2 * factor_2
+    let (_, l2) = unsigned_div_rem(l2, MAX_32_BIT)
     tempvar l3 = x1 * factor_1
+    let (_, l3) = unsigned_div_rem(l3, MAX_32_BIT)
     let l4 = [x]
     let (l1_or_l2) = bitwise_or(l1, l2)
     let (l1_or_l2_or_l3) = bitwise_or(l1_or_l2, l3)
     let (res) = bitwise_or(l1_or_l2_or_l3, l4)
-    let res = [x] + 10
     return (res=res)
 end
 
