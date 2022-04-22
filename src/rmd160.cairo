@@ -6,7 +6,7 @@ from starkware.cairo.common.bitwise import bitwise_and, bitwise_xor, bitwise_or
 from starkware.cairo.common.dict_access import DictAccess
 from starkware.cairo.common.default_dict import default_dict_new, default_dict_finalize
 from starkware.cairo.common.dict import dict_new, dict_read, dict_write, dict_squash
-from utils import MAX_32_BIT, FF, GG, HH, II, JJ, FFF, GGG, HHH, III, JJJ
+from utils import MAX_32_BIT, FF, GG, HH, II, JJ, FFF, GGG, HHH, III, JJJ, uint32_add, uint32_and, uint32_or, uint32_mul, uint32_xor
 from pow2 import pow2
 
 func absorb_data{range_check_ptr, bitwise_ptr : BitwiseBuiltin*, dict_ptr : DictAccess*}(data: felt*, len: felt, index: felt):
@@ -15,13 +15,12 @@ func absorb_data{range_check_ptr, bitwise_ptr : BitwiseBuiltin*, dict_ptr : Dict
     end
 
     let (index_4, _) = unsigned_div_rem(index, 4)
-    let (index_and_3) = bitwise_and(index, 3)
-    let (_, factor) = unsigned_div_rem(8 * index_and_3, MAX_32_BIT)
+    let (index_and_3) = uint32_and(index, 3)
+    let (factor) = uint32_mul(8, index_and_3)
     let (factor) = pow2(factor)
-    let (_, tmp) = unsigned_div_rem([data] * factor, MAX_32_BIT)
+    let (tmp) = uint32_mul([data], factor)
     let (old_val) = dict_read{dict_ptr=dict_ptr}(index_4)
-    let (val) = bitwise_xor(old_val, tmp)
-    let (_, val) = unsigned_div_rem(val, MAX_32_BIT)
+    let (val) = uint32_xor(old_val, tmp)
     dict_write{dict_ptr=dict_ptr}(index_4, val)
 
     absorb_data{dict_ptr=dict_ptr}(data+1, len, index+1)
@@ -45,12 +44,11 @@ end
 # init buf to magic constants.
 func init(buf: felt*, size: felt):
     assert size = 5
-    assert [buf] = 0x67452301
+    assert [buf + 0] = 0x67452301
     assert [buf + 1] = 0xefcdab89
     assert [buf + 2] = 0x98badcfe
     assert [buf + 3] = 0x10325476
     assert [buf + 4] = 0xc3d2e1f0
-
     return ()
 end
 
@@ -63,7 +61,7 @@ func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsiz
     assert xlen = 16
 
     # all element is in [0, 2^32).
-    let (_, aa) = unsigned_div_rem([buf], MAX_32_BIT)
+    let (_, aa) = unsigned_div_rem([buf + 0], MAX_32_BIT)
     let (_, bb) = unsigned_div_rem([buf + 1], MAX_32_BIT)
     let (_, cc) = unsigned_div_rem([buf + 2], MAX_32_BIT)
     let (_, dd) = unsigned_div_rem([buf + 3], MAX_32_BIT)
@@ -256,11 +254,22 @@ func compress{bitwise_ptr : BitwiseBuiltin*, range_check_ptr}(buf: felt*, bufsiz
 
     # combine results
     let (local res: felt*) = alloc()
-    let (_, res0) = unsigned_div_rem([buf + 1] + cc + ddd, MAX_32_BIT)
-    let (_, res1) = unsigned_div_rem([buf + 2] + dd + eee, MAX_32_BIT)
-    let (_, res2) = unsigned_div_rem([buf + 3] + ee + aaa, MAX_32_BIT)
-    let (_, res3) = unsigned_div_rem([buf + 4] + aa + bbb, MAX_32_BIT)
-    let (_, res4) = unsigned_div_rem([buf + 0] + bb + ccc, MAX_32_BIT)
+
+    let (res0) = uint32_add([buf + 1], cc)
+    let (res0) = uint32_add(res0, ddd)
+
+    let (res1) = uint32_add([buf + 2], dd)
+    let (res1) = uint32_add(res1, eee)
+
+    let (res2) = uint32_add([buf + 3], ee)
+    let (res2) = uint32_add(res2, aaa)
+
+    let (res3) = uint32_add([buf + 4], aa)
+    let (res3) = uint32_add(res3, bbb)
+
+    let (res4) = uint32_add([buf + 0], bb)
+    let (res4) = uint32_add(res4, ccc)
+
     assert res[0] = res0
     assert res[1] = res1
     assert res[2] = res2
@@ -280,28 +289,25 @@ func finish{range_check_ptr, bitwise_ptr : BitwiseBuiltin*}(buf: felt*, bufsize:
     let start = x
 
     # put data into x.
-    let (local len) = bitwise_and(dsize, 63)
-    let (_, len) = unsigned_div_rem(len, MAX_32_BIT)
+    let (local len) = uint32_and(dsize, 63)
     absorb_data{dict_ptr=x}(data, len, 0)
 
     # append the bit m_n == 1.
     let (index_4, _) = unsigned_div_rem(dsize, 4)
-    let (local index) = bitwise_and(index_4, 15)
-    let (_, index) = unsigned_div_rem(index, MAX_32_BIT)
+    let (local index) = uint32_and(index_4, 15)
     let (old_val) = dict_read{dict_ptr=x}(index)
-    let (local ba_3) = bitwise_and(dsize, 3)
-    let (_, factor) = unsigned_div_rem(8 * ba_3 + 7, MAX_32_BIT)
+    let (local ba_3) = uint32_and(dsize, 3)
+    let (factor) = uint32_add(8 * ba_3, 7)
     let (tmp) = pow2(factor)
-    let (local val) = bitwise_xor(old_val, tmp)
+    let (local val) = uint32_xor(old_val, tmp)
     dict_write{dict_ptr=x}(index, val)
 
     # length goes to next block.
-    let (_, val) = unsigned_div_rem(dsize * 8, MAX_32_BIT)
+    let (val) = uint32_mul(dsize, 8)
     let (pow2_29) = pow2(29)
     let (factor, _) = unsigned_div_rem(dsize, pow2_29)
     let len_8 = mswlen * 8
-    let (val_15) = bitwise_or(factor, len_8)
-    let (_, val_15) = unsigned_div_rem(val_15, MAX_32_BIT)
+    let (val_15) = uint32_or(factor, len_8)
 
     let (next_block) = is_nn_le(55, len)
     if next_block == 1:

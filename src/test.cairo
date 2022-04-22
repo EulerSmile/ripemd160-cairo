@@ -9,30 +9,38 @@ from starkware.cairo.common.dict import dict_new, dict_write, dict_squash
 from starkware.cairo.common.math_cmp import is_le
 from starkware.cairo.common.math import unsigned_div_rem
 from rmd160 import init, compress, finish, dict_to_array
-from utils import BYTES_TO_WORD, MAX_BYTE
+from utils import BYTES_TO_WORD, MAX_BYTE, uint8_div
 from pow2 import pow2
 
 func RMD{bitwise_ptr: BitwiseBuiltin*, range_check_ptr}(msg: felt*, msglen: felt) -> (hash: felt*):
     alloc_locals
     let (local buf: felt*) = alloc()
+    let (local arr_x: felt*) = alloc()
+
+    # 1. init magic constants
     init(buf, 5)
 
+    # 2. compress data
     let (x) = default_dict_new(0)
     let start = x
     let (res, rsize, new_msg) = compress_data{dict_ptr=x, bitwise_ptr=bitwise_ptr}(buf, 5, msg, msglen)
     let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(start, x)
+
+    # 3. finish hash
     let (res, _) = finish(res, rsize, new_msg, msglen, 0)
 
+    # 4. [optional]convert words to bytes
     let (hash) = default_dict_new(0)
     let h0 = hash
     buf2hash{dict_ptr=hash, bitwise_ptr=bitwise_ptr}(res, 0)
-    let (local arr_x: felt*) = alloc()
     dict_to_array{dict_ptr=hash}(arr_x, 20)
     let (_, _) = dict_squash{range_check_ptr=range_check_ptr}(h0, hash)
+
+    # 5. return bytes hash code.
     return (hash=arr_x)
 end
 
-func buf2hash{dict_ptr: DictAccess*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(buf: felt*, index: felt):
+func buf2hash{range_check_ptr, dict_ptr: DictAccess*, bitwise_ptr: BitwiseBuiltin*}(buf: felt*, index: felt):
     if index == 20:
         return ()
     end
@@ -42,13 +50,10 @@ func buf2hash{dict_ptr: DictAccess*, range_check_ptr, bitwise_ptr: BitwiseBuilti
     let (pow2_8) = pow2(8)
     let (pow2_16) = pow2(16)
     let (pow2_24) = pow2(24)
-    let (val_1, _) = unsigned_div_rem(val_4, pow2_8)
-    let (_, val_1) = unsigned_div_rem(val_1, MAX_BYTE)
-    let (val_2, _) = unsigned_div_rem(val_4, pow2_16)
-    let (_, val_2) = unsigned_div_rem(val_2, MAX_BYTE)
-    let (val_3, _) = unsigned_div_rem(val_4, pow2_24)
-    let (_, val_3) = unsigned_div_rem(val_3, MAX_BYTE)
-    let (_, val_4) = unsigned_div_rem(val_4, MAX_BYTE)
+    let (val_1) = uint8_div(val_4, pow2_8)
+    let (val_2) = uint8_div(val_4, pow2_16)
+    let (val_3) = uint8_div(val_4, pow2_24)
+    let (val_4) = uint8_div(val_4, 1)
 
     dict_write{dict_ptr=dict_ptr}(index, val_4)
     dict_write{dict_ptr=dict_ptr}(index + 1, val_1)
@@ -88,7 +93,7 @@ func compress_data{dict_ptr: DictAccess*, range_check_ptr, bitwise_ptr: BitwiseB
 end
 
 func main{output_ptr : felt*, range_check_ptr, bitwise_ptr: BitwiseBuiltin*}():
-    let (hash) = test1()
+    let (hash) = test2()
     serialize_word(hash[0])
     serialize_word(hash[1])
     serialize_word(hash[2])
