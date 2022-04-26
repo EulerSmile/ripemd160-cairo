@@ -14,6 +14,8 @@ func uint8_div{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x, y) -> (z):
 end
 
 func uint32_add{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x, y) -> (z):
+    assert_nn_le(x, 2**32-1)
+    assert_nn_le(y, 2**32-1)
     let z = x + y
     let (z_lt_max) = is_le(z, MAX_32_BIT)
     if z_lt_max == 1:
@@ -24,8 +26,7 @@ func uint32_add{range_check_ptr, bitwise_ptr: BitwiseBuiltin*}(x, y) -> (z):
 end
 
 func uint32_mul{range_check_ptr}(x, y) -> (z):
-    let z = x * y
-    let (_, z) = unsigned_div_rem(z, MAX_32_BIT)
+    let (_, z) = unsigned_div_rem(x*y, MAX_32_BIT)
     return (z=z)
 end
 
